@@ -31,15 +31,34 @@
             justify-content: center;
             align-items: center;
             z-index: 10;
-            background: rgba(0, 0, 0, 0.9);
+            background: radial-gradient(ellipse at top left,
+                    rgba(139, 0, 139, 0.3) 0%,
+                    rgba(0, 0, 0, 0.9) 50%),
+                radial-gradient(ellipse at bottom right,
+                    rgba(255, 0, 85, 0.3) 0%,
+                    rgba(0, 0, 0, 0.9) 50%),
+                #000;
+            background-size: 200% 200%;
+            animation: gradientShift 8s ease infinite;
             transition: opacity 1s;
+        }
+
+        @keyframes gradientShift {
+
+            0%,
+            100% {
+                background-position: 0% 0%, 100% 100%;
+            }
+
+            50% {
+                background-position: 100% 100%, 0% 0%;
+            }
         }
 
         /* Pixel heart in corner */
         .intro-heart-wrap {
             position: absolute;
-            bottom: 100px;
-            left: 100px;
+            bottom: 150px;
             animation: heartbeat 1.2s ease-in-out infinite;
             pointer-events: none;
         }
@@ -533,8 +552,7 @@
                     return;
                 }
             }
-        }
-        animationId = requestAnimationFrame(drawFrame);
+            animationId = requestAnimationFrame(drawFrame);
         }
         drawFrame();
 
