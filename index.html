@@ -490,9 +490,10 @@
                     data[i + 1] = targetPixelsCache[i + 1] * (1 - f) + Math.random() * 255 * f;
                     data[i + 2] = targetPixelsCache[i + 2] * (1 - f) + Math.random() * 255 * f;
                 } else {
-                    data[i] = Math.random() * 255;
-                    data[i + 1] = Math.random() * 255;
-                    data[i + 2] = Math.random() * 255;
+                    // Soft pink noise
+                    data[i] = 80 + Math.random() * 120;
+                    data[i + 1] = 20 + Math.random() * 60;
+                    data[i + 2] = 40 + Math.random() * 80;
                 }
                 data[i + 3] = 255;
             }
@@ -561,13 +562,13 @@
             try {
                 const app = await Client.connect(GRADIO_URL);
 
-                const result = await app.predict("/generate_batch", {
-                    seed: parseFloat(seed),
-                    steps: 8,
-                    guidance: 1.5,
-                    img_size: imgSize,
-                    cols: cols
-                });
+                const result = await app.predict("/generate_batch", [
+                    parseFloat(seed),
+                    8,
+                    1.5,
+                    imgSize,
+                    cols
+                ]);
 
                 const data = result.data[0];
                 const imageUrl = typeof data === 'string' ? data : data.url;
