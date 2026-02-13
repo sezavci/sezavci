@@ -65,7 +65,7 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // CONFIGURATION: Paste your Public Colab Link Here!
-        const GRADIO_URL = "https://73840156cf1462fd27.gradio.live"; 
+        const GRADIO_URL = "https://d77cd6c2148eed0905.gradio.live"; 
 
         const canvas = document.getElementById('canvas-layer');
         const ctx = canvas.getContext('2d');
@@ -158,39 +158,41 @@
             // 1. Hide Intro
             document.getElementById('intro-layer').style.opacity = '0';
             setTimeout(() => document.getElementById('intro-layer').style.display = 'none', 1000);
-
-            // 2. Call the API
+        
             try {
-                const client = await Client.connect(GRADIO_URL);
-                
-                // Note: We use the seed for the prompt to make it unique if the backend supports it
-                // Or pass it to the seed input if your Colab has one.
-                // Assuming your Colab inputs are: [Prompt, Negative, Seed, Steps, Guidance]
-                const result = await client.predict("/generate_pixel_art", [ 
-                    "pixel, a beautiful romantic flower garden, love symbol, 8 bit", 
-                    "blur, darkness, scary", 
-                    parseFloat(seed), // Seed
-                    20,  // Steps
-                    7.5  // Guidance
-                ]);
-
-                // 3. Load the Image
+                // Use the handle method for more stability in browsers
+                const app = await Client.connect(GRADIO_URL);
+                console.log("Connected to GPU Backend!");
+        
+                // 2. Call the API
+                // MATCHING THE COLAB: [prompt, negative_prompt, seed, steps, guidance]
+                const result = await app.predict("/generate_pixel_art", {
+                        prompt: "pixel, a beautiful romantic flower garden, love symbol, 8 bit", 
+                        negative_prompt: "blur, darkness, scary, realistic, photo", 
+                        seed: parseFloat(seed), 
+                        steps: 8, 
+                        guidance: 1.5, 
+                });
+        
                 const img = new Image();
-                img.src = result.data[0].url; // Gradio usually returns { data: [{ url: ... }] }
+                // Gradio 4.x/5.x returns data in different shapes. 
+                // This line handles both URL and base64 returns.
+                const imageData = result.data[0];
+                img.src = typeof imageData === 'string' ? imageData : imageData.url;
+        
                 img.onload = () => {
-                    // 4. Trigger the Denoising Process (Visual)
-                    // The loop inside 'animate' will detect this image and start reducing noise
-                    // We restart the loop with the image
                     cancelAnimationFrame(animationId);
                     animate(img);
                 };
-
+        
             } catch (error) {
                 console.error("Connection failed", error);
-                alert("The magic disconnected! Check if Colab is running.");
+                // Show the error on screen so you can debug
+                document.getElementById('intro-layer').style.display = 'flex';
+                document.getElementById('intro-layer').style.opacity = '1';
+                alert("The magic disconnected! Error: " + error.message);
             }
-
-            // Prepare final message
+        
             document.getElementById('valMsg').innerHTML = `Happy Valentine's Day ${name} <3`;
         };
 
