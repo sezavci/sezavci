@@ -31,12 +31,9 @@
             justify-content: center;
             align-items: center;
             z-index: 10;
-            background: radial-gradient(ellipse at top left,
-                    rgba(139, 0, 139, 0.3) 0%,
-                    rgba(0, 0, 0, 0.9) 50%),
-                radial-gradient(ellipse at bottom right,
-                    rgba(255, 0, 85, 0.3) 0%,
-                    rgba(0, 0, 0, 0.9) 50%),
+            background:
+                radial-gradient(ellipse at top left, rgba(139, 0, 139, 0.3) 0%, rgba(0, 0, 0, 0.9) 50%),
+                radial-gradient(ellipse at bottom right, rgba(255, 0, 85, 0.3) 0%, rgba(0, 0, 0, 0.9) 50()),
                 #000;
             background-size: 200% 200%;
             animation: gradientShift 8s ease infinite;
@@ -166,7 +163,7 @@
             width: 100%;
             text-align: center;
             z-index: 4;
-            font-size: 1.1rem;
+            font-size: 2.0rem;
             color: #ff7eb3;
             opacity: 0;
             transition: opacity 0.5s;
@@ -263,7 +260,7 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://fcbdcfaeb8ea952285.gradio.live";
+        const GRADIO_URL = "https://a232a075a1ecb974b7.gradio.live";
 
         // ===================== FAVICON (pixel heart) =====================
         (function () {
