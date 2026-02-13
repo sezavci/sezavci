@@ -19,7 +19,6 @@
             font-family: 'Press Start 2P', cursive;
         }
 
-        /* --- Intro Screen (from original fancy version) --- */
         #intro-layer {
             position: absolute;
             top: 0;
@@ -77,7 +76,6 @@
             box-shadow: 2px 2px #fff;
         }
 
-        /* --- Canvas --- */
         #canvas-layer {
             position: absolute;
             top: 0;
@@ -87,7 +85,6 @@
             z-index: 1;
         }
 
-        /* --- Valentine Overlay (bottom-aligned like original) --- */
         #final-layer {
             position: absolute;
             top: 0;
@@ -135,65 +132,80 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://99fae9616b7f48846f.gradio.live";
+        const GRADIO_URL = "https://06b803dd25b1dbeafd.gradio.live";
 
         const canvas = document.getElementById('canvas-layer');
         const ctx = canvas.getContext('2d');
         let width, height, animationId;
-        let showingNoise = true;
+        let noiseStrength = 255;
+        let isDenoising = false;
+        let finalImageObj = null;
+        let targetPixelsCache = null;
 
         function resize() {
             width = window.innerWidth;
             height = window.innerHeight;
             canvas.width = width;
             canvas.height = height;
+            targetPixelsCache = null;
         }
         window.addEventListener('resize', resize);
         resize();
 
-        // --- Noise animation (while waiting) ---
-        function drawNoise() {
-            if (!showingNoise) return;
+        // Consistent contain-scaling (no crop, all 4 images visible)
+        function drawContain(destCtx, img, w, h) {
+            const ratio = Math.min(w / img.width, h / img.height);
+            const dw = img.width * ratio;
+            const dh = img.height * ratio;
+            destCtx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        }
+
+        function drawFrame() {
             const imageData = ctx.createImageData(width, height);
             const data = imageData.data;
+
+            if (isDenoising && finalImageObj && !targetPixelsCache) {
+                const off = document.createElement('canvas');
+                off.width = width; off.height = height;
+                const octx = off.getContext('2d');
+                octx.fillStyle = '#000';
+                octx.fillRect(0, 0, width, height);
+                drawContain(octx, finalImageObj, width, height);
+                targetPixelsCache = octx.getImageData(0, 0, width, height).data;
+            }
+
             for (let i = 0; i < data.length; i += 4) {
-                data[i] = Math.random() * 255;
-                data[i + 1] = Math.random() * 255;
-                data[i + 2] = Math.random() * 255;
+                if (isDenoising && targetPixelsCache) {
+                    const f = noiseStrength / 255;
+                    data[i] = targetPixelsCache[i] * (1 - f) + Math.random() * 255 * f;
+                    data[i + 1] = targetPixelsCache[i + 1] * (1 - f) + Math.random() * 255 * f;
+                    data[i + 2] = targetPixelsCache[i + 2] * (1 - f) + Math.random() * 255 * f;
+                } else {
+                    data[i] = Math.random() * 255;
+                    data[i + 1] = Math.random() * 255;
+                    data[i + 2] = Math.random() * 255;
+                }
                 data[i + 3] = 255;
             }
             ctx.putImageData(imageData, 0, 0);
-            animationId = requestAnimationFrame(drawNoise);
-        }
-        drawNoise();
 
-        // --- Draw image with "contain" scaling (no crop, centered) ---
-        function drawContain(img) {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, width, height);
-            const ratio = Math.min(width / img.width, height / img.height);
-            const dw = img.width * ratio;
-            const dh = img.height * ratio;
-            ctx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh);
-        }
-
-        // --- Load image from Gradio response as blob (avoids CORS canvas taint) ---
-        function loadBlobImage(data) {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    const url = typeof data === 'string' ? data : data.url;
-                    const resp = await fetch(url);
-                    const blob = await resp.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    const img = new Image();
-                    img.onload = () => resolve(img);
-                    img.onerror = reject;
-                    img.src = blobUrl;
-                } catch (e) { reject(e); }
-            });
+            if (isDenoising) {
+                noiseStrength -= 2;
+                if (noiseStrength <= 0) {
+                    noiseStrength = 0;
+                    // Final clean draw with same scaling
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(0, 0, width, height);
+                    drawContain(ctx, finalImageObj, width, height);
+                    document.getElementById('final-layer').style.opacity = '1';
+                    return;
+                }
+            }
+            animationId = requestAnimationFrame(drawFrame);
         }
 
-        // --- Main ---
+        drawFrame();
+
         window.startMagic = async function () {
             const name = document.getElementById('nameInput').value || "Love";
             const seed = Number(document.getElementById('seedInput').value) || Math.floor(Math.random() * 1000);
@@ -205,7 +217,7 @@
             try {
                 const app = await Client.connect(GRADIO_URL);
 
-                const job = app.submit("/generate_batch", {
+                const result = await app.predict("/generate_batch", {
                     seed: parseFloat(seed),
                     steps: 8,
                     guidance: 1.5,
@@ -213,35 +225,28 @@
                     height: 384
                 });
 
-                let finalImg = null;
+                const data = result.data[0];
+                const imageUrl = typeof data === 'string' ? data : data.url;
 
-                job.on("data", async (event) => {
-                    try {
-                        const imgData = event.data ? event.data[0] : event[0];
-                        const img = await loadBlobImage(imgData);
-                        finalImg = img;
+                // Fetch as blob to avoid cross-origin canvas tainting
+                const resp = await fetch(imageUrl);
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
 
-                        // Stop noise on first real frame
-                        if (showingNoise) {
-                            showingNoise = false;
-                            cancelAnimationFrame(animationId);
-                        }
-                        drawContain(img);
-                    } catch (err) {
-                        console.warn("Frame load error:", err);
-                    }
-                });
-
-                job.on("status", (status) => {
-                    if (status.stage === "complete" && finalImg) {
-                        drawContain(finalImg);
-                        document.getElementById('final-layer').style.opacity = '1';
-                    }
-                });
+                const img = new Image();
+                img.onload = () => {
+                    finalImageObj = img;
+                    isDenoising = true;
+                };
+                img.onerror = () => {
+                    alert("Failed to load the generated image!");
+                    location.reload();
+                };
+                img.src = blobUrl;
 
             } catch (e) {
                 console.error("Connection failed:", e);
-                alert("The magic disconnected! Check if Colab is running.");
+                alert("The magic disconnected! Check if Colab is running. Error: " + e.message);
             }
         };
     </script>
