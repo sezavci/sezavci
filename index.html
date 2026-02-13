@@ -117,7 +117,8 @@
 
         window.startMagic = async function() {
             const name = document.getElementById('nameInput').value || "Love";
-            const seed = document.getElementById('seedInput').value || 42;
+            // Number() ensures "777" becomes 777
+            const seed = Number(document.getElementById('seedInput').value) || 42;
             const status = document.getElementById('status-update');
 
             document.getElementById('intro-layer').style.opacity = '0';
