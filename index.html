@@ -35,12 +35,11 @@
             transition: opacity 1s;
         }
 
-        /* Pixel heart behind intro text */
+        /* Pixel heart in corner */
         .intro-heart-wrap {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -55%);
+            bottom: 30px;
+            right: 40px;
             animation: heartbeat 1.2s ease-in-out infinite;
             pointer-events: none;
         }
@@ -66,13 +65,13 @@
 
             0%,
             100% {
-                transform: translate(-50%, -55%) scale(1.8);
-                opacity: 0.15;
+                transform: scale(2.5);
+                opacity: 0.25;
             }
 
             50% {
-                transform: translate(-50%, -55%) scale(2.1);
-                opacity: 0.3;
+                transform: scale(3);
+                opacity: 0.45;
             }
         }
 
@@ -143,16 +142,17 @@
         /* === LOADING MESSAGES === */
         #loading-msg {
             position: absolute;
-            bottom: 30px;
+            bottom: 40px;
             left: 0;
             width: 100%;
             text-align: center;
             z-index: 4;
-            font-size: 0.7rem;
+            font-size: 1.1rem;
             color: #ff7eb3;
             opacity: 0;
             transition: opacity 0.5s;
-            text-shadow: 0 0 10px #ff0055;
+            text-shadow: 0 0 15px #ff0055, 0 0 30px #ff0055;
+            letter-spacing: 2px;
         }
 
         /* === GLOW BORDER (after reveal) === */
@@ -237,7 +237,7 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://99fae9616b7f48846f.gradio.live";
+        const GRADIO_URL = "https://d67b4a3c850a051b2d.gradio.live";
 
         // ===================== FAVICON (pixel heart) =====================
         (function () {
@@ -533,7 +533,7 @@
             );
 
             // Start sparkles
-            spawnSparkles(60);
+            spawnSparkles(120);
         }
 
         // ===================== START =====================
@@ -548,7 +548,7 @@
 
             // Start falling hearts + particle animation
             particlesActive = true;
-            spawnHearts(40);
+            spawnHearts(100);
             animateParticles();
 
             // Fade intro
