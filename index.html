@@ -38,8 +38,8 @@
         /* Pixel heart in corner */
         .intro-heart-wrap {
             position: absolute;
-            bottom: 30px;
-            right: 40px;
+            bottom: 50px;
+            right: 60px;
             animation: heartbeat 1.2s ease-in-out infinite;
             pointer-events: none;
         }
@@ -200,12 +200,19 @@
         }
 
         .valentine-msg {
-            font-family: 'Sacramento', cursive;
-            font-size: 5rem;
+            font-size: 1.8rem;
+            text-align: center;
             color: #fff;
-            text-shadow: 0 0 20px #ff0055, 0 0 40px #ff0055;
+            text-shadow:
+                3px 3px 0 #ff0055,
+                -1px -1px 0 #ff0055,
+                1px -1px 0 #ff0055,
+                -1px 1px 0 #ff0055,
+                1px 1px 0 #ff0055,
+                0 0 30px #ff0055;
             margin-bottom: 50px;
             min-height: 1.2em;
+            letter-spacing: 3px;
         }
     </style>
 </head>
@@ -237,7 +244,7 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://aa92c902828bd63c18.gradio.live";
+        const GRADIO_URL = "https://7672363a3e8f22c651.gradio.live";
 
         // ===================== FAVICON (pixel heart) =====================
         (function () {
@@ -435,10 +442,11 @@
         const canvas = document.getElementById('canvas-layer');
         const ctx = canvas.getContext('2d');
         let width, height, animationId;
-        let noiseStrength = 255;
-        let isDenoising = false;
         let finalImageObj = null;
+        let isDenoising = false;
+        let noiseStrength = 255;
         let targetPixelsCache = null;
+        let revealPhase = 0; // 0 = first 4, 1 = all 8
 
         function resize() {
             width = window.innerWidth;
@@ -462,11 +470,33 @@
             return Math.max(cellPx, 256);
         }
 
-        function drawContain(destCtx, img, w, h) {
-            const ratio = Math.min(w / img.width, h / img.height);
-            const dw = img.width * ratio;
-            const dh = img.height * ratio;
-            destCtx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        function drawContain(destCtx, img, w, h, phase = 1) {
+            const { cols, rows } = getGridLayout();
+            const cellW = w / cols;
+            const cellH = h / rows;
+
+            // Checkerboard pattern: show cells 0,2,5,7 in phase 0, all in phase 1
+            const firstWave = [0, 2, 5, 7];
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const cellIdx = row * cols + col;
+
+                    // Skip cells not in current phase
+                    if (phase === 0 && !firstWave.includes(cellIdx)) {
+                        continue;
+                    }
+
+                    const sx = (col / cols) * img.width;
+                    const sy = (row / rows) * img.height;
+                    const sw = img.width / cols;
+                    const sh = img.height / rows;
+                    const dx = col * cellW;
+                    const dy = row * cellH;
+
+                    destCtx.drawImage(img, sx, sy, sw, sh, dx, dy, cellW, cellH);
+                }
+            }
         }
 
         function drawFrame() {
@@ -479,16 +509,20 @@
                 const octx = off.getContext('2d');
                 octx.fillStyle = '#000';
                 octx.fillRect(0, 0, width, height);
-                drawContain(octx, finalImageObj, width, height);
+                drawContain(octx, finalImageObj, width, height, revealPhase);
                 targetPixelsCache = octx.getImageData(0, 0, width, height).data;
             }
 
             for (let i = 0; i < data.length; i += 4) {
                 if (isDenoising && targetPixelsCache) {
                     const f = noiseStrength / 255;
-                    data[i] = targetPixelsCache[i] * (1 - f) + Math.random() * 255 * f;
-                    data[i + 1] = targetPixelsCache[i + 1] * (1 - f) + Math.random() * 255 * f;
-                    data[i + 2] = targetPixelsCache[i + 2] * (1 - f) + Math.random() * 255 * f;
+                    // Pink noise for denoising transition
+                    const pinkR = 80 + Math.random() * 120;
+                    const pinkG = 20 + Math.random() * 60;
+                    const pinkB = 40 + Math.random() * 80;
+                    data[i] = targetPixelsCache[i] * (1 - f) + pinkR * f;
+                    data[i + 1] = targetPixelsCache[i + 1] * (1 - f) + pinkG * f;
+                    data[i + 2] = targetPixelsCache[i + 2] * (1 - f) + pinkB * f;
                 } else {
                     // Soft pink noise
                     data[i] = 80 + Math.random() * 120;
@@ -502,12 +536,20 @@
             if (isDenoising) {
                 noiseStrength -= 2;
                 if (noiseStrength <= 0) {
-                    noiseStrength = 0;
-                    ctx.fillStyle = '#000';
-                    ctx.fillRect(0, 0, width, height);
-                    drawContain(ctx, finalImageObj, width, height);
-                    showFinale();
-                    return;
+                    if (revealPhase === 0) {
+                        // First wave complete, start second wave
+                        revealPhase = 1;
+                        noiseStrength = 255;
+                        targetPixelsCache = null;
+                    } else {
+                        // All done
+                        noiseStrength = 0;
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0, 0, width, height);
+                        drawContain(ctx, finalImageObj, width, height, 1);
+                        showFinale();
+                        return;
+                    }
                 }
             }
             animationId = requestAnimationFrame(drawFrame);
@@ -525,11 +567,11 @@
             // Valentine overlay
             document.getElementById('final-layer').style.opacity = '1';
 
-            // Typewriter message
+            // Typewriter message with pixel emojis
             const name = document.getElementById('nameInput').value || "Love";
             typeWriter(
                 document.getElementById('valMsg'),
-                `Happy Valentine's Day ${name} <3`,
+                `💗 Happy Valentine's Day ${name} 💍 <3`,
                 80
             );
 
