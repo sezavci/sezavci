@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Valentine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Sacramento&display=swap" rel="stylesheet">
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; }
+        
+        /* --- 1. The Intro Screen --- */
+        #intro-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10; background: rgba(0,0,0,0.9); transition: opacity 1s;
+        }
+        .fancy-text { font-size: 1.2rem; line-height: 2; text-align: center; color: #ff7eb3; text-shadow: 2px 2px #000; }
+        input {
+            background: transparent; border: none; border-bottom: 2px solid #ff7eb3;
+            color: #fff; font-family: 'Press Start 2P', cursive; font-size: 1rem;
+            text-align: center; width: 150px; outline: none; margin: 0 10px;
+        }
+        input::placeholder { color: #555; }
+        button {
+            margin-top: 30px; padding: 15px 30px; background: #ff7eb3; border: none;
+            color: #000; font-family: inherit; cursor: pointer; box-shadow: 4px 4px #fff;
+            transition: transform 0.1s;
+        }
+        button:active { transform: translate(2px, 2px); box-shadow: 2px 2px #fff; }
+
+        /* --- 2. The Display Layer (Canvas) --- */
+        #canvas-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        /* --- 3. The Valentine Overlay --- */
+        #final-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: flex-end;
+            z-index: 5; opacity: 0; pointer-events: none; transition: opacity 3s;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+        }
+        .valentine-msg {
+            font-family: 'Sacramento', cursive; font-size: 5rem; color: #fff;
+            text-shadow: 0 0 20px #ff0055, 0 0 40px #ff0055; margin-bottom: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="intro-layer">
+        <div class="fancy-text">
+            Hey, <input type="text" id="nameInput" placeholder="Name" autocomplete="off"> <br>
+            I need your lucky number >- -< <br>
+            <input type="number" id="seedInput" placeholder="777">
+        </div>
+        <button onclick="startMagic()">Generate Magic</button>
+    </div>
+
+    <canvas id="canvas-layer"></canvas>
+
+    <div id="final-layer">
+        <div class="valentine-msg" id="valMsg"></div>
+    </div>
+
+    <script type="module">
+        import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
+
+        // CONFIGURATION: Paste your Public Colab Link Here!
+        const GRADIO_URL = "https://32bb4f21f871c8b0f5.gradio.live"; 
+
+        const canvas = document.getElementById('canvas-layer');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let animationId;
+        let noiseStrength = 255; // Start with pure noise
+
+        // Resize canvas to full screen
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- The "Diffusion" Simulation ---
+        // This generates noise that slowly "resolves" into the image
+        function drawNoise(imageObj = null) {
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+            
+            // If we have the final image, draw it to an offscreen canvas to get pixel data
+            let targetPixels = null;
+            if (imageObj) {
+                const offCanvas = document.createElement('canvas');
+                offCanvas.width = width;
+                offCanvas.height = height;
+                const offCtx = offCanvas.getContext('2d');
+                // Draw image covering screen (object-fit: cover)
+                const ratio = Math.max(width / imageObj.width, height / imageObj.height);
+                const centerShift_x = (width - imageObj.width * ratio) / 2;
+                const centerShift_y = (height - imageObj.height * ratio) / 2;
+                offCtx.drawImage(imageObj, 0, 0, imageObj.width, imageObj.height, centerShift_x, centerShift_y, imageObj.width * ratio, imageObj.height * ratio);
+                targetPixels = offCtx.getImageData(0, 0, width, height).data;
+            }
+
+            for (let i = 0; i < data.length; i += 4) {
+                if (imageObj && noiseStrength < 250) {
+                    // Interpolate between Random Noise and Real Image
+                    // As noiseStrength goes down, the image reveals
+                    const r = targetPixels[i];
+                    const g = targetPixels[i + 1];
+                    const b = targetPixels[i + 2];
+                    
+                    // Add some remaining random noise based on strength
+                    const randomFactor = (Math.random() - 0.5) * noiseStrength * 2;
+                    
+                    data[i] = r + randomFactor;     // R
+                    data[i + 1] = g + randomFactor; // G
+                    data[i + 2] = b + randomFactor; // B
+                    data[i + 3] = 255; // Alpha
+                } else {
+                    // Pure colorful noise (Latent space representation)
+                    data[i] = Math.random() * 255;
+                    data[i + 1] = Math.random() * 255;
+                    data[i + 2] = Math.random() * 255;
+                    data[i + 3] = 255;
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Animation Loop
+        function animate(finalImage = null) {
+            drawNoise(finalImage);
+            
+            if (finalImage) {
+                // Reduce noise ("Denoise") step by step
+                noiseStrength -= 2; // Speed of resolving
+                if (noiseStrength <= 0) {
+                    noiseStrength = 0;
+                    drawNoise(finalImage); // Draw one last clean frame
+                    showValentine();
+                    return; // Stop animation
+                }
+            }
+            
+            animationId = requestAnimationFrame(() => animate(finalImage));
+        }
+
+        // Start the static noise loop immediately (Latent waiting state)
+        animate(); 
+
+        window.startMagic = async function() {
+            const name = document.getElementById('nameInput').value || "Love";
+            const seed = document.getElementById('seedInput').value || Math.floor(Math.random() * 1000);
+            
+            // 1. Hide Intro
+            document.getElementById('intro-layer').style.opacity = '0';
+            setTimeout(() => document.getElementById('intro-layer').style.display = 'none', 1000);
+
+            // 2. Call the API
+            try {
+                const client = await Client.connect(GRADIO_URL);
+                
+                // Note: We use the seed for the prompt to make it unique if the backend supports it
+                // Or pass it to the seed input if your Colab has one.
+                // Assuming your Colab inputs are: [Prompt, Negative, Seed, Steps, Guidance]
+                const result = await client.predict("/generate_pixel_art", [ 
+                    "pixel, a beautiful romantic flower garden, love symbol, 8 bit", 
+                    "blur, darkness, scary", 
+                    parseFloat(seed), // Seed
+                    20,  // Steps
+                    7.5  // Guidance
+                ]);
+
+                // 3. Load the Image
+                const img = new Image();
+                img.src = result.data[0].url; // Gradio usually returns { data: [{ url: ... }] }
+                img.onload = () => {
+                    // 4. Trigger the Denoising Process (Visual)
+                    // The loop inside 'animate' will detect this image and start reducing noise
+                    // We restart the loop with the image
+                    cancelAnimationFrame(animationId);
+                    animate(img);
+                };
+
+            } catch (error) {
+                console.error("Connection failed", error);
+                alert("The magic disconnected! Check if Colab is running.");
+            }
+
+            // Prepare final message
+            document.getElementById('valMsg').innerHTML = `Happy Valentine's Day ${name} <3`;
+        };
+
+        function showValentine() {
+            document.getElementById('final-layer').style.opacity = '1';
+        }
+    </script>
+</body>
+</html>
