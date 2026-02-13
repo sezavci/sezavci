@@ -19,6 +19,7 @@
             font-family: 'Press Start 2P', cursive;
         }
 
+        /* --- Intro Screen (from original fancy version) --- */
         #intro-layer {
             position: absolute;
             top: 0;
@@ -30,15 +31,16 @@
             justify-content: center;
             align-items: center;
             z-index: 10;
-            background: #000;
+            background: rgba(0, 0, 0, 0.9);
             transition: opacity 1s;
         }
 
         .fancy-text {
-            font-size: 1rem;
-            line-height: 2.5;
+            font-size: 1.2rem;
+            line-height: 2;
             text-align: center;
             color: #ff7eb3;
+            text-shadow: 2px 2px #000;
         }
 
         input {
@@ -51,6 +53,11 @@
             text-align: center;
             width: 150px;
             outline: none;
+            margin: 0 10px;
+        }
+
+        input::placeholder {
+            color: #555;
         }
 
         button {
@@ -62,28 +69,25 @@
             font-family: inherit;
             cursor: pointer;
             box-shadow: 4px 4px #fff;
+            transition: transform 0.1s;
         }
 
-        #grid-container {
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px #fff;
+        }
+
+        /* --- Canvas --- */
+        #canvas-layer {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
             z-index: 1;
-            gap: 0;
         }
 
-        .cell-canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            image-rendering: pixelated;
-        }
-
+        /* --- Valentine Overlay (bottom-aligned like original) --- */
         #final-layer {
             position: absolute;
             top: 0;
@@ -92,25 +96,20 @@
             height: 100%;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-end;
             z-index: 5;
             opacity: 0;
             pointer-events: none;
             transition: opacity 3s;
-            background: radial-gradient(circle, transparent, rgba(0, 0, 0, 0.8));
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
         }
 
         .valentine-msg {
             font-family: 'Sacramento', cursive;
             font-size: 5rem;
             color: #fff;
-            text-shadow: 0 0 20px #ff0055;
-        }
-
-        #status-update {
-            font-size: 0.6rem;
-            color: #555;
-            margin-top: 10px;
+            text-shadow: 0 0 20px #ff0055, 0 0 40px #ff0055;
+            margin-bottom: 50px;
         }
     </style>
 </head>
@@ -119,15 +118,14 @@
 
     <div id="intro-layer">
         <div class="fancy-text">
-            Hey, <input type="text" id="nameInput" placeholder="Name"> <br>
-            I need your lucky number <br>
-            <input type="number" id="seedInput" placeholder="777">
+            Hey, <input type="text" id="nameInput" placeholder="Name" autocomplete="off"> <br>
+            I need your lucky number >- -< <br>
+                <input type="number" id="seedInput" placeholder="777">
         </div>
         <button onclick="startMagic()">Generate Magic</button>
-        <div id="status-update">Ready for input...</div>
     </div>
 
-    <div id="grid-container"></div>
+    <canvas id="canvas-layer"></canvas>
 
     <div id="final-layer">
         <div class="valentine-msg" id="valMsg"></div>
@@ -136,185 +134,114 @@
     <script type="module">
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
-        // 1. UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://d304bf517e045f3726.gradio.live";
+        // UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
+        const GRADIO_URL = "https://99fae9616b7f48846f.gradio.live";
 
-        const GRID_COLS = 2;
-        const GRID_ROWS = 2;
-        const NUM_IMAGES = GRID_COLS * GRID_ROWS;
-        const GEN_SIZE = 768; // Generation resolution per image
+        const canvas = document.getElementById('canvas-layer');
+        const ctx = canvas.getContext('2d');
+        let width, height, animationId;
+        let showingNoise = true;
 
-        const PROMPTS = [
-            "pixel art, a beautiful bouquet of floating roses and peonies, romantic aesthetic, 8-bit style, vibrant colors",
-            "pixel art, a magical garden with glowing butterflies and flowers, romantic, 8-bit style",
-            "pixel art, a cozy window scene with fairy lights and flowers, romantic evening, 8-bit style",
-            "pixel art, a beautiful sunset over a flower field with hearts, romantic, 8-bit style"
-        ];
-
-        // --- Build grid ---
-        const grid = document.getElementById('grid-container');
-        const cells = [];
-
-        for (let i = 0; i < NUM_IMAGES; i++) {
-            const canvas = document.createElement('canvas');
-            canvas.className = 'cell-canvas';
-            grid.appendChild(canvas);
-            cells.push({
-                canvas,
-                ctx: canvas.getContext('2d'),
-                noiseStrength: 255,
-                isDenoising: false,
-                finalImage: null,
-                targetPixelsCache: null,
-                done: false,
-                width: 0,
-                height: 0
-            });
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
         }
+        window.addEventListener('resize', resize);
+        resize();
 
-        // --- Resize handler ---
-        function resizeAll() {
-            const cellWidth = Math.ceil(window.innerWidth / GRID_COLS);
-            const cellHeight = Math.ceil(window.innerHeight / GRID_ROWS);
-            cells.forEach(cell => {
-                cell.canvas.width = cellWidth;
-                cell.canvas.height = cellHeight;
-                cell.width = cellWidth;
-                cell.height = cellHeight;
-                cell.targetPixelsCache = null; // invalidate cache on resize
-            });
+        // --- Noise animation (while waiting) ---
+        function drawNoise() {
+            if (!showingNoise) return;
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = Math.random() * 255;
+                data[i + 1] = Math.random() * 255;
+                data[i + 2] = Math.random() * 255;
+                data[i + 3] = 255;
+            }
+            ctx.putImageData(imageData, 0, 0);
+            animationId = requestAnimationFrame(drawNoise);
         }
-        window.addEventListener('resize', resizeAll);
-        resizeAll();
+        drawNoise();
 
-        // --- Consistent cover-scaling draw ---
-        function coverDraw(ctx, img, w, h) {
-            const ratio = Math.max(w / img.width, h / img.height);
+        // --- Draw image with "contain" scaling (no crop, centered) ---
+        function drawContain(img) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, width, height);
+            const ratio = Math.min(width / img.width, height / img.height);
             const dw = img.width * ratio;
             const dh = img.height * ratio;
-            ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+            ctx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh);
         }
 
-        // --- Animation loop ---
-        function drawFrame() {
-            let allDone = true;
-
-            for (const cell of cells) {
-                if (cell.done) continue;
-                allDone = false;
-
-                const { ctx, width, height } = cell;
-                const imageData = ctx.createImageData(width, height);
-                const data = imageData.data;
-
-                // Cache target pixels once per image (avoids offscreen redraw every frame)
-                let targetPixels = null;
-                if (cell.isDenoising && cell.finalImage) {
-                    if (!cell.targetPixelsCache) {
-                        const off = document.createElement('canvas');
-                        off.width = width; off.height = height;
-                        const octx = off.getContext('2d');
-                        coverDraw(octx, cell.finalImage, width, height);
-                        cell.targetPixelsCache = octx.getImageData(0, 0, width, height).data;
-                    }
-                    targetPixels = cell.targetPixelsCache;
-                }
-
-                for (let i = 0; i < data.length; i += 4) {
-                    if (targetPixels) {
-                        const f = cell.noiseStrength / 255;
-                        data[i] = targetPixels[i] * (1 - f) + Math.random() * 255 * f;
-                        data[i + 1] = targetPixels[i + 1] * (1 - f) + Math.random() * 255 * f;
-                        data[i + 2] = targetPixels[i + 2] * (1 - f) + Math.random() * 255 * f;
-                    } else {
-                        data[i] = Math.random() * 255;
-                        data[i + 1] = Math.random() * 255;
-                        data[i + 2] = Math.random() * 255;
-                    }
-                    data[i + 3] = 255;
-                }
-                ctx.putImageData(imageData, 0, 0);
-
-                if (cell.isDenoising) {
-                    cell.noiseStrength -= 1.5;
-                    if (cell.noiseStrength <= 0) {
-                        cell.noiseStrength = 0;
-                        // Final clean draw uses identical cover scaling
-                        coverDraw(ctx, cell.finalImage, width, height);
-                        cell.done = true;
-                    }
-                }
-            }
-
-            // Show valentine message only when ALL images are denoised
-            if (allDone && cells.some(c => c.finalImage)) {
-                document.getElementById('final-layer').style.opacity = '1';
-                return;
-            }
-            requestAnimationFrame(drawFrame);
+        // --- Load image from Gradio response as blob (avoids CORS canvas taint) ---
+        function loadBlobImage(data) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const url = typeof data === 'string' ? data : data.url;
+                    const resp = await fetch(url);
+                    const blob = await resp.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = blobUrl;
+                } catch (e) { reject(e); }
+            });
         }
 
-        drawFrame();
-
-        // --- Main logic ---
+        // --- Main ---
         window.startMagic = async function () {
             const name = document.getElementById('nameInput').value || "Love";
-            const baseSeed = Number(document.getElementById('seedInput').value) || 42;
-            const status = document.getElementById('status-update');
+            const seed = Number(document.getElementById('seedInput').value) || Math.floor(Math.random() * 1000);
 
             document.getElementById('intro-layer').style.opacity = '0';
             setTimeout(() => document.getElementById('intro-layer').style.display = 'none', 1000);
-            status.innerText = "Connecting to GPU...";
-
             document.getElementById('valMsg').innerHTML = `Happy Valentine's Day ${name} <3`;
 
             try {
                 const app = await Client.connect(GRADIO_URL);
-                status.innerText = `GPU Processing... generating ${NUM_IMAGES} images`;
 
-                // Fire all requests in parallel — GPU processes them sequentially,
-                // so images arrive one-by-one for a staggered denoising reveal
-                const promises = [];
-                for (let i = 0; i < NUM_IMAGES; i++) {
-                    const seed = baseSeed + i;
-                    const prompt = PROMPTS[i % PROMPTS.length];
+                const job = app.submit("/generate_batch", {
+                    seed: parseFloat(seed),
+                    steps: 8,
+                    guidance: 1.5,
+                    width: 768,
+                    height: 384
+                });
 
-                    const p = app.predict("/generate_pixel_art", {
-                        prompt: prompt,
-                        negative_prompt: "realistic, photo, blurry, 3d render",
-                        seed: seed,
-                        steps: 8,
-                        guidance: 1.5,
-                        width: GEN_SIZE,
-                        height: GEN_SIZE
-                    }).then(async (result) => {
-                        // Fetch as blob to avoid cross-origin canvas tainting
-                        const data = result.data[0];
-                        const imageUrl = typeof data === 'string' ? data : data.url;
-                        const imgResponse = await fetch(imageUrl);
-                        const blob = await imgResponse.blob();
-                        const blobUrl = URL.createObjectURL(blob);
+                let finalImg = null;
 
-                        return new Promise((resolve, reject) => {
-                            const img = new Image();
-                            img.onload = () => {
-                                cells[i].finalImage = img;
-                                cells[i].isDenoising = true;
-                                resolve();
-                            };
-                            img.onerror = reject;
-                            img.src = blobUrl;
-                        });
-                    });
+                job.on("data", async (event) => {
+                    try {
+                        const imgData = event.data ? event.data[0] : event[0];
+                        const img = await loadBlobImage(imgData);
+                        finalImg = img;
 
-                    promises.push(p);
-                }
+                        // Stop noise on first real frame
+                        if (showingNoise) {
+                            showingNoise = false;
+                            cancelAnimationFrame(animationId);
+                        }
+                        drawContain(img);
+                    } catch (err) {
+                        console.warn("Frame load error:", err);
+                    }
+                });
 
-                await Promise.all(promises);
+                job.on("status", (status) => {
+                    if (status.stage === "complete" && finalImg) {
+                        drawContain(finalImg);
+                        document.getElementById('final-layer').style.opacity = '1';
+                    }
+                });
 
             } catch (e) {
-                alert("Magic Connection Lost! Error: " + e.message);
-                location.reload();
+                console.error("Connection failed:", e);
+                alert("The magic disconnected! Check if Colab is running.");
             }
         };
     </script>
