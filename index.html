@@ -38,8 +38,8 @@
         /* Pixel heart in corner */
         .intro-heart-wrap {
             position: absolute;
-            bottom: 80px;
-            right: 80px;
+            bottom: 100px;
+            left: 100px;
             animation: heartbeat 1.2s ease-in-out infinite;
             pointer-events: none;
         }
@@ -446,7 +446,6 @@
         let isDenoising = false;
         let noiseStrength = 255;
         let targetPixelsCache = null;
-        let revealPhase = 0; // 0 = first 4, 1 = all 8
 
         function resize() {
             width = window.innerWidth;
@@ -470,23 +469,13 @@
             return Math.max(cellPx, 256);
         }
 
-        function drawContain(destCtx, img, w, h, phase = 1) {
+        function drawContain(destCtx, img, w, h) {
             const { cols, rows } = getGridLayout();
             const cellW = w / cols;
             const cellH = h / rows;
 
-            // Checkerboard pattern: show cells 0,2,5,7 in phase 0, all in phase 1
-            const firstWave = [0, 2, 5, 7];
-
             for (let row = 0; row < rows; row++) {
                 for (let col = 0; col < cols; col++) {
-                    const cellIdx = row * cols + col;
-
-                    // Skip cells not in current phase
-                    if (phase === 0 && !firstWave.includes(cellIdx)) {
-                        continue;
-                    }
-
                     const sx = (col / cols) * img.width;
                     const sy = (row / rows) * img.height;
                     const sw = img.width / cols;
@@ -509,7 +498,7 @@
                 const octx = off.getContext('2d');
                 octx.fillStyle = '#000';
                 octx.fillRect(0, 0, width, height);
-                drawContain(octx, finalImageObj, width, height, revealPhase);
+                drawContain(octx, finalImageObj, width, height);
                 targetPixelsCache = octx.getImageData(0, 0, width, height).data;
             }
 
@@ -533,51 +522,19 @@
             }
             ctx.putImageData(imageData, 0, 0);
 
-            // During phase 1, keep first 4 cells visible (no noise)
-            if (revealPhase === 1 && finalImageObj) {
-                ctx.save();
-                const { cols, rows } = getGridLayout();
-                const cellW = width / cols;
-                const cellH = height / rows;
-                const firstWave = [0, 2, 5, 7];
-
-                for (let row = 0; row < rows; row++) {
-                    for (let col = 0; col < cols; col++) {
-                        const cellIdx = row * cols + col;
-                        if (firstWave.includes(cellIdx)) {
-                            const sx = (col / cols) * finalImageObj.width;
-                            const sy = (row / rows) * finalImageObj.height;
-                            const sw = finalImageObj.width / cols;
-                            const sh = finalImageObj.height / rows;
-                            const dx = col * cellW;
-                            const dy = row * cellH;
-                            ctx.drawImage(finalImageObj, sx, sy, sw, sh, dx, dy, cellW, cellH);
-                        }
-                    }
-                }
-                ctx.restore();
-            }
-
             if (isDenoising) {
                 noiseStrength -= 2;
                 if (noiseStrength <= 0) {
-                    if (revealPhase === 0) {
-                        // First wave complete, start second wave
-                        revealPhase = 1;
-                        noiseStrength = 255;
-                        targetPixelsCache = null;
-                    } else {
-                        // All done
-                        noiseStrength = 0;
-                        ctx.fillStyle = '#000';
-                        ctx.fillRect(0, 0, width, height);
-                        drawContain(ctx, finalImageObj, width, height, 1);
-                        showFinale();
-                        return;
-                    }
+                    noiseStrength = 0;
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(0, 0, width, height);
+                    drawContain(ctx, finalImageObj, width, height);
+                    showFinale();
+                    return;
                 }
             }
-            animationId = requestAnimationFrame(drawFrame);
+        }
+        animationId = requestAnimationFrame(drawFrame);
         }
         drawFrame();
 
