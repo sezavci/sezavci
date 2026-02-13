@@ -38,8 +38,8 @@
         /* Pixel heart in corner */
         .intro-heart-wrap {
             position: absolute;
-            bottom: 50px;
-            right: 60px;
+            bottom: 80px;
+            right: 80px;
             animation: heartbeat 1.2s ease-in-out infinite;
             pointer-events: none;
         }
@@ -244,7 +244,7 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://7672363a3e8f22c651.gradio.live";
+        const GRADIO_URL = "https://fcbdcfaeb8ea952285.gradio.live";
 
         // ===================== FAVICON (pixel heart) =====================
         (function () {
@@ -532,6 +532,31 @@
                 data[i + 3] = 255;
             }
             ctx.putImageData(imageData, 0, 0);
+
+            // During phase 1, keep first 4 cells visible (no noise)
+            if (revealPhase === 1 && finalImageObj) {
+                ctx.save();
+                const { cols, rows } = getGridLayout();
+                const cellW = width / cols;
+                const cellH = height / rows;
+                const firstWave = [0, 2, 5, 7];
+
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        const cellIdx = row * cols + col;
+                        if (firstWave.includes(cellIdx)) {
+                            const sx = (col / cols) * finalImageObj.width;
+                            const sy = (row / rows) * finalImageObj.height;
+                            const sw = finalImageObj.width / cols;
+                            const sh = finalImageObj.height / rows;
+                            const dx = col * cellW;
+                            const dy = row * cellH;
+                            ctx.drawImage(finalImageObj, sx, sy, sw, sh, dx, dy, cellW, cellH);
+                        }
+                    }
+                }
+                ctx.restore();
+            }
 
             if (isDenoising) {
                 noiseStrength -= 2;
