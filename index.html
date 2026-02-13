@@ -1,37 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Pixel Valentine</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Sacramento&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Sacramento&display=swap"
+        rel="stylesheet">
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; color: #fff; font-family: 'Press Start 2P', cursive; }
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+        }
+
         #intro-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 10; background: #000; transition: opacity 1s;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            background: #000;
+            transition: opacity 1s;
         }
-        .fancy-text { font-size: 1rem; line-height: 2.5; text-align: center; color: #ff7eb3; }
+
+        .fancy-text {
+            font-size: 1rem;
+            line-height: 2.5;
+            text-align: center;
+            color: #ff7eb3;
+        }
+
         input {
-            background: transparent; border: none; border-bottom: 2px solid #ff7eb3;
-            color: #fff; font-family: 'Press Start 2P', cursive; font-size: 1rem;
-            text-align: center; width: 150px; outline: none;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #ff7eb3;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            text-align: center;
+            width: 150px;
+            outline: none;
         }
+
         button {
-            margin-top: 30px; padding: 15px 30px; background: #ff7eb3; border: none;
-            color: #000; font-family: inherit; cursor: pointer; box-shadow: 4px 4px #fff;
+            margin-top: 30px;
+            padding: 15px 30px;
+            background: #ff7eb3;
+            border: none;
+            color: #000;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 4px 4px #fff;
         }
-        #canvas-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; image-rendering: pixelated; }
+
+        #canvas-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            image-rendering: pixelated;
+        }
+
         #final-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: center;
-            z-index: 5; opacity: 0; pointer-events: none; transition: opacity 3s;
-            background: radial-gradient(circle, transparent, rgba(0,0,0,0.8));
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 3s;
+            background: radial-gradient(circle, transparent, rgba(0, 0, 0, 0.8));
         }
-        .valentine-msg { font-family: 'Sacramento', cursive; font-size: 5rem; color: #fff; text-shadow: 0 0 20px #ff0055; }
-        #status-update { font-size: 0.6rem; color: #555; margin-top: 10px; }
+
+        .valentine-msg {
+            font-family: 'Sacramento', cursive;
+            font-size: 5rem;
+            color: #fff;
+            text-shadow: 0 0 20px #ff0055;
+        }
+
+        #status-update {
+            font-size: 0.6rem;
+            color: #555;
+            margin-top: 10px;
+        }
     </style>
 </head>
+
 <body>
 
     <div id="intro-layer">
@@ -54,7 +126,7 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // 1. UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://8ea600037b125f0f4d.gradio.live"; 
+        const GRADIO_URL = "https://8ea600037b125f0f4d.gradio.live";
 
         const canvas = document.getElementById('canvas-layer');
         const ctx = canvas.getContext('2d');
@@ -80,9 +152,9 @@
                 off.width = width; off.height = height;
                 const octx = off.getContext('2d');
                 const ratio = Math.max(width / finalImageObj.width, height / finalImageObj.height);
-                octx.drawImage(finalImageObj, 0, 0, finalImageObj.width, finalImageObj.height, 
-                             (width - finalImageObj.width * ratio) / 2, (height - finalImageObj.height * ratio) / 2, 
-                             finalImageObj.width * ratio, finalImageObj.height * ratio);
+                octx.drawImage(finalImageObj, 0, 0, finalImageObj.width, finalImageObj.height,
+                    (width - finalImageObj.width * ratio) / 2, (height - finalImageObj.height * ratio) / 2,
+                    finalImageObj.width * ratio, finalImageObj.height * ratio);
                 targetPixels = octx.getImageData(0, 0, width, height).data;
             }
 
@@ -90,14 +162,14 @@
                 if (isDenoising && targetPixels) {
                     const factor = noiseStrength / 255;
                     data[i] = targetPixels[i] * (1 - factor) + (Math.random() * 255 * factor);
-                    data[i+1] = targetPixels[i+1] * (1 - factor) + (Math.random() * 255 * factor);
-                    data[i+2] = targetPixels[i+2] * (1 - factor) + (Math.random() * 255 * factor);
+                    data[i + 1] = targetPixels[i + 1] * (1 - factor) + (Math.random() * 255 * factor);
+                    data[i + 2] = targetPixels[i + 2] * (1 - factor) + (Math.random() * 255 * factor);
                 } else {
                     data[i] = Math.random() * 255;
-                    data[i+1] = Math.random() * 255;
-                    data[i+2] = Math.random() * 255;
+                    data[i + 1] = Math.random() * 255;
+                    data[i + 2] = Math.random() * 255;
                 }
-                data[i+3] = 255;
+                data[i + 3] = 255;
             }
             ctx.putImageData(imageData, 0, 0);
 
@@ -107,7 +179,7 @@
                     noiseStrength = 0;
                     ctx.drawImage(finalImageObj, 0, 0, width, height); // Final clean snap
                     document.getElementById('final-layer').style.opacity = '1';
-                    return; 
+                    return;
                 }
             }
             animationId = requestAnimationFrame(drawFrame);
@@ -115,7 +187,7 @@
 
         drawFrame();
 
-        window.startMagic = async function() {
+        window.startMagic = async function () {
             const name = document.getElementById('nameInput').value || "Love";
             // Number() ensures "777" becomes 777
             const seed = Number(document.getElementById('seedInput').value) || 42;
@@ -128,7 +200,7 @@
             try {
                 const app = await Client.connect(GRADIO_URL);
                 status.innerText = "GPU Processing... (Sampling)";
-                
+
                 const result = await app.predict("/generate_pixel_art", {
                     prompt: "pixel art, a beautiful bouquet of floating flowers, romantic aesthetic, 8-bit style",
                     negative_prompt: "realistic, photo, blurry",
@@ -137,15 +209,25 @@
                     guidance: 1.5
                 });
 
-                const img = new Image();
-                // This handles the new Gradio file object structure
+                // Get the image URL from the Gradio response
                 const data = result.data[0];
-                img.src = typeof data === 'string' ? data : data.url;
-                
+                const imageUrl = typeof data === 'string' ? data : data.url;
+
+                // Fetch as blob to avoid cross-origin canvas tainting
+                const imgResponse = await fetch(imageUrl);
+                const blob = await imgResponse.blob();
+                const blobUrl = URL.createObjectURL(blob);
+
+                const img = new Image();
                 img.onload = () => {
                     finalImageObj = img;
                     isDenoising = true;
                 };
+                img.onerror = () => {
+                    alert("Failed to load the generated image!");
+                    location.reload();
+                };
+                img.src = blobUrl;
 
             } catch (e) {
                 alert("Magic Connection Lost! Error: " + e.message);
@@ -156,4 +238,5 @@
         };
     </script>
 </body>
+
 </html>
