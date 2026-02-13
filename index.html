@@ -132,7 +132,10 @@
         import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
         // UPDATE THIS LINK FROM YOUR COLAB EVERY TIME YOU RESTART
-        const GRADIO_URL = "https://06b803dd25b1dbeafd.gradio.live";
+        const GRADIO_URL = "https://d67b4a3c850a051b2d.gradio.live";
+
+        const GRID_COLS = 4;
+        const GRID_ROWS = 2;
 
         const canvas = document.getElementById('canvas-layer');
         const ctx = canvas.getContext('2d');
@@ -152,7 +155,15 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Consistent contain-scaling (no crop, all 4 images visible)
+        // Compute optimal square image size based on viewport
+        function computeCellSize() {
+            const cellW = window.innerWidth / GRID_COLS;
+            const cellH = window.innerHeight / GRID_ROWS;
+            const cellPx = Math.floor(Math.min(cellW, cellH) / 8) * 8;
+            return Math.max(cellPx, 256);
+        }
+
+        // Contain-scale: fit entire image in canvas, no cropping
         function drawContain(destCtx, img, w, h) {
             const ratio = Math.min(w / img.width, h / img.height);
             const dw = img.width * ratio;
@@ -193,7 +204,6 @@
                 noiseStrength -= 2;
                 if (noiseStrength <= 0) {
                     noiseStrength = 0;
-                    // Final clean draw with same scaling
                     ctx.fillStyle = '#000';
                     ctx.fillRect(0, 0, width, height);
                     drawContain(ctx, finalImageObj, width, height);
@@ -209,6 +219,7 @@
         window.startMagic = async function () {
             const name = document.getElementById('nameInput').value || "Love";
             const seed = Number(document.getElementById('seedInput').value) || Math.floor(Math.random() * 1000);
+            const imgSize = computeCellSize();
 
             document.getElementById('intro-layer').style.opacity = '0';
             setTimeout(() => document.getElementById('intro-layer').style.display = 'none', 1000);
@@ -221,14 +232,12 @@
                     seed: parseFloat(seed),
                     steps: 8,
                     guidance: 1.5,
-                    width: 768,
-                    height: 384
+                    img_size: imgSize
                 });
 
                 const data = result.data[0];
                 const imageUrl = typeof data === 'string' ? data : data.url;
 
-                // Fetch as blob to avoid cross-origin canvas tainting
                 const resp = await fetch(imageUrl);
                 const blob = await resp.blob();
                 const blobUrl = URL.createObjectURL(blob);
