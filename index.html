@@ -489,14 +489,44 @@
         function drawContain(destCtx, img, w, h) {
             const { cols, rows } = getGridLayout();
 
-            // On portrait screens, preserve image aspect ratio to avoid stretching.
+            // On portrait screens, force a vertical 2x4 layout without stretching.
             if (w < h) {
-                const scale = Math.min(w / img.width, h / img.height);
-                const drawW = img.width * scale;
-                const drawH = img.height * scale;
+                let source = img;
+
+                // If backend still returned landscape 4x2, remap tiles into 2x4.
+                if (img.width > img.height) {
+                    const srcCols = 4;
+                    const srcRows = 2;
+                    const dstCols = 2;
+                    const dstRows = 4;
+                    const cellW = img.width / srcCols;
+                    const cellH = img.height / srcRows;
+
+                    const off = document.createElement('canvas');
+                    off.width = cellW * dstCols;
+                    off.height = cellH * dstRows;
+                    const octx = off.getContext('2d');
+
+                    for (let i = 0; i < srcCols * srcRows; i++) {
+                        const sCol = i % srcCols;
+                        const sRow = Math.floor(i / srcCols);
+                        const dCol = i % dstCols;
+                        const dRow = Math.floor(i / dstCols);
+                        octx.drawImage(
+                            img,
+                            sCol * cellW, sRow * cellH, cellW, cellH,
+                            dCol * cellW, dRow * cellH, cellW, cellH
+                        );
+                    }
+                    source = off;
+                }
+
+                const scale = Math.min(w / source.width, h / source.height);
+                const drawW = source.width * scale;
+                const drawH = source.height * scale;
                 const dx = (w - drawW) / 2;
                 const dy = (h - drawH) / 2;
-                destCtx.drawImage(img, dx, dy, drawW, drawH);
+                destCtx.drawImage(source, dx, dy, drawW, drawH);
                 return;
             }
 
