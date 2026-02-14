@@ -474,7 +474,10 @@
         resize();
 
         function getGridLayout() {
-            return { cols: 4, rows: 2 };
+            // Desktop: 4x2 (cols x rows). Mobile-sized screens: 2x4.
+            return window.matchMedia("(max-width: 900px)").matches
+                ? { cols: 2, rows: 4 }
+                : { cols: 4, rows: 2 };
         }
 
         function computeCellSize() {
@@ -486,7 +489,7 @@
         function drawContain(destCtx, img, w, h) {
             const { cols, rows } = getGridLayout();
 
-            // On portrait/mobile, keep 4x2 without distortion by letterboxing.
+            // On portrait screens, preserve image aspect ratio to avoid stretching.
             if (w < h) {
                 const scale = Math.min(w / img.width, h / img.height);
                 const drawW = img.width * scale;
