@@ -474,9 +474,7 @@
         resize();
 
         function getGridLayout() {
-            return window.innerWidth >= window.innerHeight
-                ? { cols: 4, rows: 2 }
-                : { cols: 2, rows: 4 };
+            return { cols: 4, rows: 2 };
         }
 
         function computeCellSize() {
@@ -487,6 +485,18 @@
 
         function drawContain(destCtx, img, w, h) {
             const { cols, rows } = getGridLayout();
+
+            // On portrait/mobile, keep 4x2 without distortion by letterboxing.
+            if (w < h) {
+                const scale = Math.min(w / img.width, h / img.height);
+                const drawW = img.width * scale;
+                const drawH = img.height * scale;
+                const dx = (w - drawW) / 2;
+                const dy = (h - drawH) / 2;
+                destCtx.drawImage(img, dx, dy, drawW, drawH);
+                return;
+            }
+
             const cellW = w / cols;
             const cellH = h / rows;
 
